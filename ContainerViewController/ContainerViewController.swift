@@ -8,9 +8,8 @@
 
 import UIKit
 
-class ContainerViewController: UIViewController {
+class ContainerViewController: UIViewController , UIViewControllerTransitioningDelegate{
     var viewControllers : [UIViewController] = [UIViewController]()
-    
     enum Orientation{
         case Left,Right
     }
@@ -74,37 +73,52 @@ class ContainerViewController: UIViewController {
     }
     //子视图控制器之间的转场切换
     func swipeFromViewController(fromViewController:UIViewController,ToViewController toViewController:UIViewController, WithOrientation orientation:Orientation){
+        //fromViewController.willMoveToParentViewController(nil)
+//        self.addChildViewController(toViewController)
+//        toViewController.view.bounds = container.bounds
+//        let endCenter:CGPoint;
+//        fromViewController.transitioningDelegate = self;
+//        if orientation == Orientation.Left{
+//            toViewController.view.center = CGPointMake(self.view.bounds.size.width + toViewController.view.bounds.size.width/2, self.view.bounds.size.height/2)
+//            endCenter = CGPointMake(-self.view.bounds.size.width - toViewController.view.bounds.size.width/2, self.view.bounds.size.height/2)
+//        }
+//        else
+//        {
+//            toViewController.view.center = CGPointMake(-self.view.bounds.size.width - toViewController.view.bounds.size.width/2, self.view.bounds.size.height/2)
+//            endCenter = CGPointMake(self.view.bounds.size.width + toViewController.view.bounds.size.width/2, self.view.bounds.size.height/2)
+//        }
+//        self.transitionFromViewController(fromViewController, toViewController: toViewController, duration: 0.25, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+//            toViewController.view.frame = fromViewController.view.frame
+//            fromViewController.view.center = endCenter
+//            }) { (completion) -> Void in
+//                toViewController.didMoveToParentViewController(self)
+//                fromViewController.removeFromParentViewController()
+//        }
+
         fromViewController.willMoveToParentViewController(nil)
         self.addChildViewController(toViewController)
-        toViewController.view.bounds = container.bounds
-        let endCenter:CGPoint;
-        if orientation == Orientation.Left{
-            toViewController.view.center = CGPointMake(self.view.bounds.size.width + toViewController.view.bounds.size.width/2, self.view.bounds.size.height/2)
-            endCenter = CGPointMake(-self.view.bounds.size.width - toViewController.view.bounds.size.width/2, self.view.bounds.size.height/2)
+        let context = CustomTransitionContext(containerView: container, toViewController: toViewController, fromViewController: fromViewController)
+        context.completeHandle = {
+            (isComplete : Bool) -> Void in
+            toViewController.didMoveToParentViewController(self)
+            fromViewController.removeFromParentViewController()
         }
-        else
-        {
-            toViewController.view.center = CGPointMake(-self.view.bounds.size.width - toViewController.view.bounds.size.width/2, self.view.bounds.size.height/2)
-            endCenter = CGPointMake(self.view.bounds.size.width + toViewController.view.bounds.size.width/2, self.view.bounds.size.height/2)
-        }
-        self.transitionFromViewController(fromViewController, toViewController: toViewController, duration: 0.25, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
-            toViewController.view.frame = fromViewController.view.frame
-            fromViewController.view.center = endCenter
-            }) { (completion) -> Void in
-                toViewController.didMoveToParentViewController(self)
-                fromViewController.removeFromParentViewController()
-        }
+        let animator = CustomTransitionAnimtor(context: context)
+        animator.orientaion = orientation
+        animator.animateTransition(context)
     }
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
-        // Get the new view controller using segue.destinationViewController.
-        // Pass the selected object to the new view controller.
+    func animationControllerForDismissedController(dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        return nil
     }
-    */
-
+    func animationControllerForPresentedController(presented: UIViewController, presentingController presenting: UIViewController, sourceController source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        return CustomTransitionAnimtor(context: CustomTransitionContext(containerView: container, toViewController: presenting, fromViewController: presented))
+    }
+    func interactionControllerForDismissal(animator: UIViewControllerAnimatedTransitioning) -> UIViewControllerInteractiveTransitioning? {
+        return nil
+    }
+    func interactionControllerForPresentation(animator: UIViewControllerAnimatedTransitioning) -> UIViewControllerInteractiveTransitioning? {
+        return nil
+    }
 }
 @IBDesignable
 class ContainerView: UIView {
@@ -125,4 +139,123 @@ class ContainerView: UIView {
         self.clipsToBounds = false
         
     }
+}
+class CustomTransitionContext: NSObject , UIViewControllerContextTransitioning {
+    weak var customContainerView : UIView?
+    private weak var toViewController:UIViewController?
+    private weak var fromViewController:UIViewController?
+    internal var completeHandle : ((isComplete : Bool)->Void)?;
+    var animating : Bool = true
+    func isAnimated() -> Bool {
+        return animating
+    }
+    func isInteractive() -> Bool {
+        return false
+    }
+    func transitionWasCancelled() -> Bool {
+        return false
+    }
+    func presentationStyle() -> UIModalPresentationStyle {
+        return UIModalPresentationStyle.Custom
+    }
+    func completeTransition(didComplete: Bool) {
+        if let handler = completeHandle {
+            animating = false
+            handler(isComplete: didComplete)
+        }
+    }
+    func updateInteractiveTransition(percentComplete: CGFloat) {
+        
+    }
+    func finishInteractiveTransition() {
+        
+    }
+    func cancelInteractiveTransition() {
+        
+    }
+    func viewControllerForKey(key: String) -> UIViewController? {
+        switch key{
+        case UITransitionContextFromViewControllerKey:
+            return fromViewController
+        case UITransitionContextToViewControllerKey:
+            return toViewController
+        default:
+            return nil
+        }
+    }
+    @available(iOS 8.0,*)
+    func viewForKey(key: String) -> UIView? {
+        switch key{
+        case UITransitionContextFromViewKey:
+            return fromViewController?.view
+        case UITransitionContextToViewKey:
+            return toViewController?.view
+        default:
+            return nil
+        }
+    }
+    
+    func finalFrameForViewController(vc: UIViewController) -> CGRect {
+        return CGRectZero
+    }
+    
+    func initialFrameForViewController(vc: UIViewController) -> CGRect {
+        return CGRectZero
+    }
+    func containerView() -> UIView? {
+        return self.customContainerView
+    }
+    
+    convenience init(containerView : UIView? ,toViewController : UIViewController , fromViewController : UIViewController){
+        self.init()
+        self.toViewController = toViewController
+        self.fromViewController = fromViewController
+        self.customContainerView = containerView
+    }
+    
+    func targetTransform() -> CGAffineTransform {
+        return CGAffineTransformIdentity
+    }
+}
+
+class CustomTransitionAnimtor: NSObject , UIViewControllerAnimatedTransitioning {
+    internal var orientaion : ContainerViewController.Orientation = ContainerViewController.Orientation.Left
+    var toViewController : UIViewController?
+    var fromViewController : UIViewController?
+    var privateContext : CustomTransitionContext;
+    func transitionDuration(transitionContext: UIViewControllerContextTransitioning?) -> NSTimeInterval {
+        return 0.25
+    }
+    init(context : CustomTransitionContext){
+        privateContext = context
+        super.init()
+    }
+    func animateTransition(transitionContext: UIViewControllerContextTransitioning) {
+        let containerView = privateContext.containerView()
+        let toViewController = privateContext.viewControllerForKey(UITransitionContextToViewControllerKey)
+        let fromViewController = privateContext.viewControllerForKey(UITransitionContextFromViewControllerKey)
+        toViewController?.view.bounds = (fromViewController?.view.bounds)!
+        var endCenter : CGPoint;
+        if orientaion == ContainerViewController.Orientation.Left{
+            endCenter = CGPointMake(-(fromViewController?.view.bounds.size.width)!, (containerView?.bounds.size.height)!/2)
+            toViewController?.view.center = CGPointMake((containerView?.bounds.size.width)! + (toViewController?.view.bounds.width)!/2, (containerView?.bounds.height)!/2)
+        }
+        else
+        {
+            endCenter = CGPointMake((containerView?.bounds.size.width)! + (fromViewController?.view.bounds.size.width)!/2, (containerView?.bounds.size.height)!/2)
+            toViewController?.view.center = CGPointMake(-(containerView?.bounds.size.width)! - (toViewController?.view.bounds.width)!/2, (containerView?.bounds.height)!/2)
+        }
+        containerView?.addSubview((toViewController?.view)!)
+        UIView.animateWithDuration(self.transitionDuration(privateContext), animations: { () -> Void in
+            toViewController?.view.center = (fromViewController?.view.center)!
+            fromViewController?.view.center = endCenter
+            }) { (isComplection) -> Void in
+                fromViewController?.view.removeFromSuperview()
+                self.animationEnded(true)
+        }
+    }
+    func animationEnded(transitionCompleted: Bool) {
+        self.privateContext.completeTransition(true)
+    }
+    
 }
